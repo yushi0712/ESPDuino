@@ -21,7 +21,11 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
 ******************************************************************************/
-#include <avr/pgmspace.h>
+#if defined(__AVR__)
+	#include <avr/pgmspace.h>
+#else
+	#include <pgmspace.h>
+#endif
 #include <Arduino.h>
 #include <Wire.h>
 #include <RPR-0521RS.h>
@@ -214,7 +218,7 @@ byte RPR0521RS::read(unsigned char memory_address, unsigned char *data, int size
 
   Wire.beginTransmission(RPR0521RS_DEVICE_ADDRESS);
   Wire.write(memory_address);
-  rc = Wire.endTransmission(false);
+  rc = Wire.endTransmission(true);
   if (rc != 0) {
     return (rc);
   }
