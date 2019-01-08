@@ -30,7 +30,7 @@ void setup() {
   while (!Serial);
   Serial.print("[2]");
   
-  Wire.begin();
+  Wire.begin(SDA, SCL);
   Serial.print("[3]");
   
   rc = rpr0521rs.init();
@@ -45,8 +45,6 @@ void loop() {
   float als_val;
   byte near_far;
   
-  Serial.print(SCL);
-  Serial.println();
   rc = rpr0521rs.get_psalsval(&ps_val, &als_val);
   if (rc == 0) {
     Serial.print(F("RPR-0521RS (Proximity)     = "));
