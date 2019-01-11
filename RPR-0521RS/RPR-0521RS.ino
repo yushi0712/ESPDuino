@@ -22,6 +22,10 @@
 
 RPR0521RS rpr0521rs;
 
+#define PIN_SDA SDA
+#define PIN_SCL SCL
+
+
 void setup() {
   byte rc;
 
@@ -30,7 +34,7 @@ void setup() {
   while (!Serial);
   Serial.print("[2]");
   
-  Wire.begin(SDA, SCL);
+  Wire.begin(PIN_SDA, PIN_SCL);
   Serial.print("[3]");
   
   rc = rpr0521rs.init();
