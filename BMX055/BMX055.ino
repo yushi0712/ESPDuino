@@ -17,6 +17,10 @@
 // BMX055　磁気センサのI2Cアドレス
 #define Addr_Mag 0x13   // (JP1,JP2,JP3 = Openの時)
 
+#define PIN_SDA SDA
+#define PIN_SCL SCL
+
+
 // センサーの値を保存するグローバル関数
 float xAccl = 0.00;
 float yAccl = 0.00;
@@ -31,9 +35,9 @@ int   zMag  = 0;
 void setup()
 {
   // Wire(Arduino-I2C)の初期化
-  Wire.begin();
+  Wire.begin(PIN_SDA, PIN_SCL);
   // デバック用シリアル通信は9600bps
-  Serial.begin(9600);
+  Serial.begin(115200);
   //BMX055 初期化
   BMX055_Init();
   delay(300);
