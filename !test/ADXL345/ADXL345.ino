@@ -95,14 +95,51 @@ float pre_acc = 0;
 void loop() 
 {
 	int error;
-	float dT;
+	float	acc_x, acc_y, acc_z;
+	float	gyro_x, gyro_y, gyro_z;
+	float	temperature;
+
+	// 加速度、角速度、温度を取得
+	error = ADXL_get_all(&acc_x, &acc_y, &acc_z, &gyro_x, &gyro_y, &gyro_z, &temperature);
+
+	Serial.print(error, DEC);
+	Serial.print("\t");
+
+	Serial.print(temperature, 1);
+	Serial.print("\t");
+
+	float abs_acc2 = (acc_x*acc_x + acc_y*acc_y + acc_z*acc_z);
+	float diff_acc = abs_acc2-pre_acc;
+	pre_acc = abs_acc2;
+	Serial.print(diff_acc, 2);
+	Serial.print("\t");
+	Serial.println("");
+
+	if(diff_acc < 0.5) {
+		digitalWrite(13,LOW);
+	}
+	else {
+		digitalWrite(13,HIGH);
+	}
+
+	delay(500);
+}
+
+int ADXL_get_all(
+		float* p_acc_x,
+		float* p_acc_y,
+		float* p_acc_z,
+		float* p_gyro_x,
+		float* p_gyro_y,
+		float* p_gyro_z,
+		float* p_temperature)
+{
+	int error;
 	accel_t_gyro_union accel_t_gyro;
 
 	// 加速度、角速度の読み出し
 	// accel_t_gyroは読み出した値を保存する構造体、その後ろの引数は取り出すバイト数
 	error = MPU6050_read(MPU6050_ACCEL_XOUT_H, (uint8_t *)&accel_t_gyro, sizeof(accel_t_gyro));
-	Serial.print(error, DEC);
-	Serial.print("\t");
 
 	// 取得できるデータはビッグエンディアンなので上位バイトと下位バイトの入れ替え（AVRはリトルエンディアン）
 	uint8_t swap;
@@ -114,64 +151,20 @@ void loop()
 	SWAP (accel_t_gyro.reg.y_gyro_h, accel_t_gyro.reg.y_gyro_l);
 	SWAP (accel_t_gyro.reg.z_gyro_h, accel_t_gyro.reg.z_gyro_l);
 
-	// 温度の計算。式はレジスタマップに載ってます。この式おかしいかも…。
-	dT = ( (float) accel_t_gyro.value.temperature + 12412.0) / 340.0;
-	Serial.print(dT, 1);
-	Serial.print("\t");
-
 	// 取得した加速度値を分解能で割って加速度(G)に変換する
-	float acc_x = accel_t_gyro.value.x_accel / 16384.0; //FS_SEL_0 16,384 LSB / g
-	float acc_y = accel_t_gyro.value.y_accel / 16384.0;
-	float acc_z = accel_t_gyro.value.z_accel / 16384.0;
+	*p_acc_x = accel_t_gyro.value.x_accel / 16384.0; //FS_SEL_0 16,384 LSB / g
+	*p_acc_y = accel_t_gyro.value.y_accel / 16384.0;
+	*p_acc_z = accel_t_gyro.value.z_accel / 16384.0;
 
-	float abs_acc2 = (acc_x*acc_x + acc_y*acc_y + acc_z*acc_z);
-
-	float diff_acc = abs_acc2-pre_acc;
-	Serial.print(diff_acc, 2);
-	pre_acc = abs_acc2;
-	Serial.print("\t");
-
-	/*
-	Serial.print(acc_x, 2);
-	Serial.print("\t");
-	Serial.print(acc_y, 2);
-	Serial.print("\t");
-	Serial.print(acc_z, 2);
-	Serial.print("\t");
-	*/
-	/*
-	// 加速度からセンサ対地角を求める
-	float acc_angle_x = atan2(acc_x, acc_z) * 360 / 2.0 / PI;
-	float acc_angle_y = atan2(acc_y, acc_z) * 360 / 2.0 / PI;
-	float acc_angle_z = atan2(acc_x, acc_y) * 360 / 2.0 / PI;
-
-	Serial.print(acc_angle_x, 2);
-	Serial.print("\t");
-	Serial.print(acc_angle_y, 2);
-	Serial.print("\t");
-	Serial.print(acc_angle_z, 2);
-	Serial.print("\t");
 	// 取得した角速度値を分解能で割って角速度(degrees per sec)に変換する
-	float gyro_x = accel_t_gyro.value.x_gyro / 131.0;//FS_SEL_0 131 LSB / (°/s)
-	float gyro_y = accel_t_gyro.value.y_gyro / 131.0;
-	float gyro_z = accel_t_gyro.value.z_gyro / 131.0;
+	*p_gyro_x = accel_t_gyro.value.x_gyro / 131.0;//FS_SEL_0 131 LSB / (°/s)
+	*p_gyro_y = accel_t_gyro.value.y_gyro / 131.0;
+	*p_gyro_z = accel_t_gyro.value.z_gyro / 131.0;
 
-	Serial.print(gyro_x, 2);
-	Serial.print("\t");
-	Serial.print(gyro_y, 2);
-	Serial.print("\t");
-	Serial.print(gyro_z, 2);
-	*/
-	Serial.println("");
+	// 温度の計算。式はレジスタマップに載ってます。この式おかしいかも…。
+	*p_temperature = ( (float) accel_t_gyro.value.temperature + 12412.0) / 340.0;
 
-	if(diff_acc < 0.5) {
-		digitalWrite(13,LOW);
-	}
-	else {
-		digitalWrite(13,HIGH);
-	}
-
-	delay(500);
+	return	error;
 }
 
 // MPU6050_read
