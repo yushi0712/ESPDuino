@@ -46,13 +46,15 @@ typedef union accel_t_gyro_union {
 	value;
 };
 
-void ADXL345_init(int sdaPin, int sclPin)
+TwoWire* g_pWire = NULL;
+
+
+void ADXL345_init(TwoWire* pWire)
 {
 	int error;
 	uint8_t c;
 
-
-	Wire.begin(sdaPin, sclPin);
+	g_pWire = pWire;
 
 	// 初回の読み出し
 	error = MPU6050_read(MPU6050_WHO_AM_I, &c, 1);
@@ -81,8 +83,11 @@ void setup()
 	// ボーレートを115200bpsにセット
 	Serial.begin(9600);
 	//  Serial.begin(115200);
-	
-	ADXL345_init(IO_PIN_SDA, IO_PIN_SCL);
+
+	// I2C初期化	
+	Wire.begin(IO_PIN_SDA, IO_PIN_SCL);
+
+	ADXL345_init(&Wire);
 
 }
 
@@ -172,55 +177,66 @@ void loop()
 // MPU6050_read
 int MPU6050_read(int start, uint8_t *buffer, int size) 
 {
-  int i, n, error;
-  Wire.beginTransmission(MPU6050_I2C_ADDRESS);
-  n = Wire.write(start);
-  if (n != 1) {
-    return (-10);
-  }
-  n = Wire.endTransmission(false);// hold the I2C-bus
-  if (n != 0) {
-    return (n);
-  }
-  // Third parameter is true: relase I2C-bus after data is read.
-  Wire.requestFrom(MPU6050_I2C_ADDRESS, size, true);
-  i = 0;
-  while (Wire.available() && i < size) {
-    buffer[i++] = Wire.read();
-  }
-  if ( i != size) {
-    return (-11);
-  }
-  return (0); // return : no error
+	int i, n, error;
+
+	if(g_pWire == NULL) {
+		return	-99;
+	}
+
+	g_pWire->beginTransmission(MPU6050_I2C_ADDRESS);
+	n = g_pWire->write(start);
+	if(n != 1) {
+		return (-10);
+	}
+	n = g_pWire->endTransmission(false);// hold the I2C-bus
+	if(n != 0) {
+		return (n);
+	}
+	// Third parameter is true: relase I2C-bus after data is read.
+	g_pWire->requestFrom(MPU6050_I2C_ADDRESS, size, true);
+	i = 0;
+	while(g_pWire->available() && i < size) {
+		buffer[i++] = g_pWire->read();
+	}
+	if( i != size) {
+		return (-11);
+	}
+	
+	return (0); // return : no error
 }
 
 // MPU6050_write
 int MPU6050_write(int start, const uint8_t *pData, int size) 
 {
-  int n, error;
-  Wire.beginTransmission(MPU6050_I2C_ADDRESS);
-  n = Wire.write(start);// write the start address
-  if (n != 1) {
-    return (-20);
-  }
-  n = Wire.write(pData, size);// write data bytes
-  if (n != size) {
-    return (-21);
-  }
-  error = Wire.endTransmission(true); // release the I2C-bus
-  if (error != 0) {
-    return (error);
-  }
+	int n, error;
 
-  return (0);// return : no error
+	if(g_pWire == NULL) {
+		return	-99;
+	}
+
+	g_pWire->beginTransmission(MPU6050_I2C_ADDRESS);
+	n = g_pWire->write(start);// write the start address
+	if(n != 1) {
+		return (-20);
+	}
+	n = g_pWire->write(pData, size);// write data bytes
+	if(n != size) {
+		return (-21);
+	}
+	error = g_pWire->endTransmission(true); // release the I2C-bus
+	if(error != 0) {
+		return (error);
+	}
+
+	return (0);// return : no error
 }
 
 // MPU6050_write_reg
 int MPU6050_write_reg(int reg, uint8_t data) 
 {
-  int error;
-  error = MPU6050_write(reg, &data, 1);
-  Serial.print("error = ");
-  Serial.println(error);
-  return (error);
+	int error;
+	error = MPU6050_write(reg, &data, 1);
+	Serial.print("error = ");
+	Serial.println(error);
+	return (error);
 };
