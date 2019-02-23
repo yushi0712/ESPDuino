@@ -1,3 +1,6 @@
+#include <Wire.h>
+#include <RPR-0521RS.h>
+
 #include "BluetoothSerial.h"
 #include "esp_system.h"
 
@@ -21,6 +24,9 @@
 #define IO_PIN_LINETRACK_LEFT	(26)
 #define IO_PIN_LINETRACK_CENTER	(17)
 #define IO_PIN_LINETRACK_RIGHT	(39)
+// I2C
+#define IO_PIN_SDA 				SDA
+#define IO_PIN_SCL 				SCL
 
 // DACのchannel
 #define DAC_CH_MOTOR_A			(0)
@@ -60,6 +66,8 @@
 
 
 //BluetoothSerial SerialBT;
+
+RPR0521RS rpr0521rs;
 
 
 int	g_state_motor = STATE_MOTOR_STOP;
@@ -212,10 +220,17 @@ void _stop()
 
 void setup()
 {
+	byte rc;
+
+	Serial.println("Start setup program.");
 	g_ctrl_mode = CTRLMODE_MANUAL_DRIVE;
 
-	Serial.begin(9600);
+	// Serial Port(USB) 初期設定
+	Serial.begin(115200);
+	// Bluetooth 初期設定
 	//SerialBT.begin("ESP32");
+	// I2C 初期設定
+	Wire.begin(IO_PIN_SDA, IO_PIN_SCL);
 
 	pinMode(IO_PIN_US_ECHO, INPUT);    
 	pinMode(IO_PIN_US_TRIG, OUTPUT);  
@@ -250,10 +265,39 @@ void setup()
     _servo_angle(0);//********xxxxx setservo position according to scaled value
     delay(500); 
 
+  	// 照度・近接センサの初期設定
+	rc = rpr0521rs.init();
+	if(rc != 0) {
+		Serial.println("[Error] cannot initialize RPR-0521.");
+	}
+
+	Serial.println("Completed setup program successfully.");
 }
 
 void loop()
 {
+	byte rc;
+	unsigned short ps_val;
+	float als_val;
+	byte near_far;
+
+	// 照度・近接センサの値を取得
+	rc = rpr0521rs.get_psalsval(&ps_val, &als_val);
+	if(rc == 0) {
+		// 近接センサ
+		Serial.print(F("Proximity = "));
+		Serial.print(ps_val);
+		Serial.println(F(" [count]"));
+		// 照度センサ
+		if (als_val != RPR0521RS_ERROR) {
+			Serial.print(F("Ambient Light = "));
+			Serial.print(als_val);
+			Serial.println(F(" [lx]"));
+			Serial.println();
+		}
+	}
+
+
 	int dist = _us_get_distance();
 
 	// Stop in case of obstacle
