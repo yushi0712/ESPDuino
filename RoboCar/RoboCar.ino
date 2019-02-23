@@ -278,8 +278,42 @@ void setup()
 	Serial.println("Completed setup program successfully.");
 }
 
+float pre_abs_axl = 0;
 void loop()
 {
+	int error;
+	float	acc_x, acc_y, acc_z;
+	float	gyro_x, gyro_y, gyro_z;
+	float	temperature;
+
+	// 加速度、角速度、温度を取得
+	error = MPU6050_get_all(&acc_x, &acc_y, &acc_z, &gyro_x, &gyro_y, &gyro_z, &temperature);
+
+	Serial.print(error, DEC);
+	Serial.print("\t");
+
+	Serial.print(temperature, 1);
+	Serial.print("\t");
+
+	float abs_axl = (acc_x*acc_x + acc_y*acc_y + acc_z*acc_z);
+	float diff_axl = abs_axl - pre_abs_axl;
+	if(diff_axl < 0) {
+		diff_axl = -diff_axl;
+	}
+	pre_abs_axl = abs_axl;
+	Serial.print(diff_axl, 2);
+	Serial.print("\t");
+	Serial.println("");
+
+	if(diff_axl < 0.2) {
+		digitalWrite(IO_PIN_LED,LOW);
+	}
+	else {
+		digitalWrite(IO_PIN_LED,HIGH);
+	}
+
+	delay(50);
+
 	byte rc;
 	unsigned short ps_val;
 	float als_val;
@@ -301,7 +335,6 @@ void loop()
 		}
 	}
 
-
 	int dist = _us_get_distance();
 
 	// Stop in case of obstacle
@@ -313,8 +346,8 @@ void loop()
 			_stop();
 		}
 	}
-	char getstr = Serial.read();
 
+	char getstr = Serial.read();
 	if(getstr == 'a') {
 		g_ctrl_mode = CTRLMODE_AUTO_DRIVE;
 		_stop();
