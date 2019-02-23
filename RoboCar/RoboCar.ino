@@ -3,6 +3,7 @@
 
 #include "BluetoothSerial.h"
 #include "esp_system.h"
+#include "dev_MPU6050.h"
 
 // Motor
 #define	IO_PIN_MOTOR_1			(14)
@@ -270,6 +271,9 @@ void setup()
 	if(rc != 0) {
 		Serial.println("[Error] cannot initialize RPR-0521.");
 	}
+
+	// ‰Á‘¬“xƒZƒ“ƒT‰Šú‰»
+	MPU6050_init(&Wire);
 
 	Serial.println("Completed setup program successfully.");
 }
