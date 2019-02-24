@@ -78,6 +78,8 @@ int g_motor_speed_right;
 int g_motor_speed_left;
 int	g_ctrl_mode = CTRLMODE_MANUAL_DRIVE;
 
+int g_stop_distance = 20;	// [cm]
+
 float servo_coeff_a;
 float servo_coeff_b;
 
@@ -100,7 +102,7 @@ void _servo_angle(int angle)
 	ledcWrite(DAC_CH_SERVO, 0);	
 }
 
-int _us_get_distance(unsigned long max_dist=100)   // return:[cm](timeout”­¶‚Í32767)  max_dist:[cm]
+float SR04_get_distance(unsigned long max_dist=100)   // return:[cm](timeout”­¶‚Í10000.0)  max_dist:[cm]
 {
 	// Pulse”­¶
 	digitalWrite(IO_PIN_US_TRIG, LOW);   
@@ -119,8 +121,25 @@ int _us_get_distance(unsigned long max_dist=100)   // return:[cm](timeout”­¶‚
 		dist = duration * 0.017; // [cm]
 	}
 
-	return (int)dist;
+	return dist;
 }  
+
+int _us_get_distance()   // return:[cm](timeout”­¶‚Í10000)
+{
+	float dist; 
+	float dist_sum = 0.0; 
+	int i;
+	for(i = 0; i < 5; i ++) {
+		dist = SR04_get_distance(50); 
+		if(dist > 9000.0) {
+			// timeout‚ªˆê“x‚Å‚àŒv‘ª‚³‚ê‚½‚Æ‚«‚Í‘O•û‚É‰½‚à‚È‚¢‚ÆŒ©‚È‚·
+			return	10000;
+		}
+		dist_sum += dist;
+	}
+	
+	return	(int)(dist_sum*0.2); // 5‚ÅŠ„‚é‘ã‚í‚è‚É0.2‚ğŠ|‚¯‚é
+}
 
 void _ctrl_motor_left(int dir, int speed)
 {
@@ -401,7 +420,7 @@ unsigned long dist_sum=0;
 unsigned long int dist_avg=0;
 int dist_max=0;
 int dist_min=10000;
-int avg_num=100;
+int avg_num=20;
 void loop()
 {
 	int dist = _us_get_distance();
@@ -431,7 +450,7 @@ void loop()
 		
 
 	// Stop in case of obstacle
-    if(dist <= 20) {
+    if(dist <= g_stop_distance) {
 		if((g_state_motor==STATE_MOTOR_MOVING_FORWARD) || 
 			(g_state_motor==STATE_MOTOR_TURNING_RIGHT) ||
 			(g_state_motor==STATE_MOTOR_TURNING_LEFT)) 
@@ -498,7 +517,7 @@ void loop()
 			delay(500); 
 			middle_distance = _us_get_distance();
 
-			if(middle_distance<=30) {     
+			if(middle_distance <= g_stop_distance) {     
 				_stop();
 				delay(500); 	  
 				_servo_angle(-80);  
@@ -523,7 +542,7 @@ void loop()
 					_rotate_ccw(150);
 					delay(360);
 				}
-				else if((right_distance<=30)||(left_distance<=30)) {
+				else if((right_distance<=g_stop_distance) || (left_distance<=g_stop_distance)) {
 					_move_backward(MOTOR_SPEED);
 					delay(180);
 				}
