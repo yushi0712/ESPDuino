@@ -415,50 +415,8 @@ void setup()
 	Serial.println("Completed setup program successfully.");
 }
 
-int count=0;
-unsigned long dist_sum=0;
-unsigned long int dist_avg=0;
-int dist_max=0;
-int dist_min=10000;
-int avg_num=20;
 void loop()
 {
-	int dist = _us_get_distance();
-	dist_sum += dist;
-	count ++;
-	if(dist > dist_max) {
-		dist_max = dist;
-	}
-	else if(dist < dist_min) {
-		dist_min = dist;
-	}
-	if(count > avg_num) {
-		dist_avg = dist_sum / avg_num;
-		Serial.print("max:");
-		Serial.print(dist_max);
-		Serial.print("  min:");
-		Serial.print(dist_min);
-		Serial.print("  avg:");
-		Serial.print(dist_avg);
-		Serial.println();
-
-		count = 0;
-		dist_max = 0;
-		dist_min = 10000;
-		dist_sum = 0;
-	}
-		
-
-	// Stop in case of obstacle
-    if(dist <= g_stop_distance) {
-		if((g_state_motor==STATE_MOTOR_MOVING_FORWARD) || 
-			(g_state_motor==STATE_MOTOR_TURNING_RIGHT) ||
-			(g_state_motor==STATE_MOTOR_TURNING_LEFT)) 
-		{
-			_stop();
-		}
-	}
-
 	char getstr = Serial.read();
 	if(getstr == 'a') {
 		g_ctrl_mode = CTRLMODE_AUTO_DRIVE;
@@ -470,6 +428,17 @@ void loop()
 	}
 
 	if(g_ctrl_mode == CTRLMODE_MANUAL_DRIVE) {
+		// Stop in case of obstacle
+		int dist = _us_get_distance();
+	    if(dist <= g_stop_distance) {
+			if((g_state_motor==STATE_MOTOR_MOVING_FORWARD) || 
+				(g_state_motor==STATE_MOTOR_TURNING_RIGHT) ||
+				(g_state_motor==STATE_MOTOR_TURNING_LEFT)) 
+			{
+				_stop();
+			}
+		}
+
 		if(getstr=='f') {
 			_move_forward(MOTOR_SPEED);
 		}
