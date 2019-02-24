@@ -77,6 +77,8 @@ int	g_state_motor = STATE_MOTOR_STOP;
 int g_motor_speed_right;
 int g_motor_speed_left;
 int	g_ctrl_mode = CTRLMODE_MANUAL_DRIVE;
+int g_turn_speed = 140;
+int g_turn_level = 40;
 
 int g_stop_distance = 20;	// [cm]
 
@@ -95,6 +97,7 @@ void _servo_angle(int angle)
 	if(angle > 90.0) {
 		angle = 90.0;
 	}
+	angle -= 10;
 
 	int val = (int)(servo_coeff_a*angle + servo_coeff_b);
 	ledcWrite(DAC_CH_SERVO, val);
@@ -279,7 +282,7 @@ void _Task_sensor(void* param)
 		}
 		pre_abs_axl = abs_axl;
 
-		if(diff_axl < 0.2) {
+		if(diff_axl < 0.5) {
 			digitalWrite(IO_PIN_LED,LOW);
 		}
 		else {
@@ -444,31 +447,24 @@ void loop()
 		}
 		else if(getstr=='b') {
 			_move_backward(MOTOR_SPEED);
-			delay(200);
 		}
 		else if(getstr=='l') {
 			_rotate_ccw(MOTOR_SPEED);
-			delay(200);
 		}
 		else if(getstr=='r') {
 			_rotate_cw(MOTOR_SPEED);
-			delay(200);
 		}
 		else if(getstr=='L') {
-			_turn_left(MOTOR_DIR_FWD, 120, 70);
-			delay(200);
+			_turn_left(MOTOR_DIR_FWD, g_turn_speed, g_turn_level);
 		}
 		else if(getstr=='R') {
-			_turn_right(MOTOR_DIR_FWD, 120, 70);
-			delay(200);
+			_turn_right(MOTOR_DIR_FWD, g_turn_speed, g_turn_level+20); // ”÷’²®
 		}
 		else if(getstr=='C') {
-			_turn_left(MOTOR_DIR_REV, 120, 70);
-			delay(200);
+			_turn_left(MOTOR_DIR_REV, g_turn_speed, g_turn_level);
 		}
 		else if(getstr=='D') {
-			_turn_right(MOTOR_DIR_REV, 120, 70);
-			delay(200);
+			_turn_right(MOTOR_DIR_REV, g_turn_speed, g_turn_level+20);
 		}
 		else if(getstr=='s') {
 			_stop();		 
@@ -482,8 +478,6 @@ void loop()
 			_stop();		 
 		}		
 		else {
-			_servo_angle(0);//setservo position according to scaled value
-			delay(500); 
 			middle_distance = _us_get_distance();
 
 			if(middle_distance <= g_stop_distance) {     
@@ -503,17 +497,21 @@ void loop()
 				delay(500);
 				_servo_angle(0);              
 				delay(1000);
-				if(right_distance>left_distance) {
-					_rotate_cw(150);
-					delay(360);
+				if((right_distance<=g_stop_distance) && (left_distance<=g_stop_distance)) {
+					_move_backward(MOTOR_SPEED);
+					delay(180);
+				}
+				else if((right_distance>9000) && (left_distance>9000)) {
+					_rotate_cw(180); // CW/CCW‚Ì‚Ç‚¿‚ç‚Å‚à‚æ‚¢
+					delay(500);
+				}
+				else if(right_distance>left_distance) {
+					_rotate_cw(180);
+					delay(500);
 				}
 				else if(right_distance<left_distance) {
 					_rotate_ccw(150);
-					delay(360);
-				}
-				else if((right_distance<=g_stop_distance) || (left_distance<=g_stop_distance)) {
-					_move_backward(MOTOR_SPEED);
-					delay(180);
+					delay(500);
 				}
 				else {
 					_move_forward(MOTOR_SPEED);
