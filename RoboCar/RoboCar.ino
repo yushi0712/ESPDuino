@@ -68,7 +68,7 @@
 
 
 
-//BluetoothSerial SerialBT;
+BluetoothSerial SerialBT;
 
 RPR0521RS rpr0521rs;
 
@@ -100,17 +100,26 @@ void _servo_angle(int angle)
 	ledcWrite(DAC_CH_SERVO, 0);	
 }
 
-int _us_get_distance()   
+int _us_get_distance(unsigned long max_dist=100)   // return:[cm](timeout発生時は32767)  max_dist:[cm]
 {
+	// Pulse発生
 	digitalWrite(IO_PIN_US_TRIG, LOW);   
-	delayMicroseconds(20);
+	delayMicroseconds(2);
 	digitalWrite(IO_PIN_US_TRIG, HIGH);  
 	delayMicroseconds(20);
 	digitalWrite(IO_PIN_US_TRIG, LOW);   
-	float Fdistance = pulseIn(IO_PIN_US_ECHO, HIGH);  
-	Fdistance= Fdistance/58;       
+	
+	// 反射波到達までの時間計測(timeout発生時は0)
+	unsigned long duration = pulseIn(IO_PIN_US_ECHO, HIGH, max_dist*58);  
+	float dist;
+	if(duration == 0) {
+		dist = 10000.0;
+	}
+	else {
+		dist = duration * 0.017; // [cm]
+	}
 
-	return (int)Fdistance;
+	return (int)dist;
 }  
 
 void _ctrl_motor_left(int dir, int speed)
@@ -224,18 +233,18 @@ void _stop()
 	Serial.println("Stop!");
 }
 
-float pre_abs_axl = 0;
 float	g_temperature = 0.0;
 float	g_max_diff_axl = 0.0;
 unsigned short g_ps_val;
 float g_als_val;
-void _Task_axl(void* param)
+void _Task_sensor(void* param)
 {
 	int error;
 	float	acc_x, acc_y, acc_z;
 	float	gyro_x, gyro_y, gyro_z;
 	BaseType_t xStatus;
 	byte rc;
+	float pre_abs_axl = 0;
 
 	xSemaphoreGive(g_xMutex);
 	for(;;) {
@@ -300,6 +309,7 @@ void _Task_disp(void* param)
 		xSemaphoreGive(g_xMutex);
 		// ▲▲▲ [排他制御区間]開始 ▲▲▲
 
+		/*
 		// 加速度センサ
 		Serial.print("Temp:");
 		Serial.print(temperature, 1);
@@ -316,6 +326,7 @@ void _Task_disp(void* param)
 		Serial.println();
 
 		Serial.println();
+		*/
 	}
 	
 }
@@ -327,10 +338,11 @@ void setup()
 	Serial.println("Start setup program.");
 	g_ctrl_mode = CTRLMODE_MANUAL_DRIVE;
 
-	// Serial Port(USB) 初期設定
-	Serial.begin(115200);
+	// Serial Port(USB) 初期設定(115200bpsだとBluetoothが動作しない)
+	Serial.begin(9600);
+//	Serial.begin(115200);
 	// Bluetooth 初期設定
-	//SerialBT.begin("ESP32");
+	SerialBT.begin("ESP32");
 	// I2C 初期設定
 	Wire.begin(IO_PIN_SDA, IO_PIN_SCL);
 
@@ -378,15 +390,45 @@ void setup()
 
 	// コア0で関数task0をstackサイズ4096,優先順位1(大きいほど優先度高)で起動
 	g_xMutex = xSemaphoreCreateMutex();
-	xTaskCreatePinnedToCore(_Task_axl, "Task_axl", 4096, NULL, 2, NULL, 0);
+	xTaskCreatePinnedToCore(_Task_sensor, "Task_sensor", 4096, NULL, 2, NULL, 0);
 	xTaskCreatePinnedToCore(_Task_disp, "Task_disp", 4096, NULL, 1, NULL, 0);
 
 	Serial.println("Completed setup program successfully.");
 }
 
+int count=0;
+unsigned long dist_sum=0;
+unsigned long int dist_avg=0;
+int dist_max=0;
+int dist_min=10000;
+int avg_num=100;
 void loop()
 {
 	int dist = _us_get_distance();
+	dist_sum += dist;
+	count ++;
+	if(dist > dist_max) {
+		dist_max = dist;
+	}
+	else if(dist < dist_min) {
+		dist_min = dist;
+	}
+	if(count > avg_num) {
+		dist_avg = dist_sum / avg_num;
+		Serial.print("max:");
+		Serial.print(dist_max);
+		Serial.print("  min:");
+		Serial.print(dist_min);
+		Serial.print("  avg:");
+		Serial.print(dist_avg);
+		Serial.println();
+
+		count = 0;
+		dist_max = 0;
+		dist_min = 10000;
+		dist_sum = 0;
+	}
+		
 
 	// Stop in case of obstacle
     if(dist <= 20) {
