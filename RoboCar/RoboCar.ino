@@ -258,7 +258,6 @@ void _Task_axl(void* param)
 			digitalWrite(IO_PIN_LED,HIGH);
 		}
 
-
 		// 照度・近接センサの値を取得
 		unsigned short ps_val;
 		float als_val;
@@ -277,6 +276,48 @@ void _Task_axl(void* param)
 		// ▲▲▲ [排他制御区間]開始 ▲▲▲
 	}
 
+}
+
+void _Task_disp(void* param)
+{
+	BaseType_t xStatus;
+	float	temperature = 0.0;
+	float	max_diff_axl = 0.0;
+	unsigned short ps_val;
+	float als_val;
+
+	xSemaphoreGive(g_xMutex);
+	for(;;) {
+		vTaskDelay(2000);
+		
+		// ▼▼▼ [排他制御区間]開始 ▼▼▼
+		xStatus = xSemaphoreTake(g_xMutex, 0);
+		temperature = g_temperature;
+		max_diff_axl = g_max_diff_axl;
+		ps_val = g_ps_val;
+		als_val = g_als_val;
+		g_max_diff_axl = 0.0; // リセット
+		xSemaphoreGive(g_xMutex);
+		// ▲▲▲ [排他制御区間]開始 ▲▲▲
+
+		// 加速度センサ
+		Serial.print("Temp:");
+		Serial.print(temperature, 1);
+		Serial.print("\t");
+		Serial.print("Axl:");
+		Serial.print(max_diff_axl, 2);
+		Serial.println("");
+		// 近接センサ
+		Serial.print(F("Proximity:"));
+		Serial.print(ps_val);
+		Serial.print(F("\t"));
+		Serial.print(F("Light:"));
+		Serial.print(als_val);
+		Serial.println();
+
+		Serial.println();
+	}
+	
 }
 
 void setup()
@@ -335,33 +376,16 @@ void setup()
 	// 加速度センサ初期化
 	MPU6050_init(&Wire);
 
-	// コア0で関数task0をstackサイズ4096,優先順位1で起動
+	// コア0で関数task0をstackサイズ4096,優先順位1(大きいほど優先度高)で起動
 	g_xMutex = xSemaphoreCreateMutex();
-	xTaskCreatePinnedToCore(_Task_axl, "Task_axl", 4096, NULL, 1, NULL, 0);
+	xTaskCreatePinnedToCore(_Task_axl, "Task_axl", 4096, NULL, 2, NULL, 0);
+	xTaskCreatePinnedToCore(_Task_disp, "Task_disp", 4096, NULL, 1, NULL, 0);
 
 	Serial.println("Completed setup program successfully.");
 }
 
 void loop()
 {
-	// 加速度センサ
-	Serial.print("Temp:");
-	Serial.print(g_temperature, 1);
-	Serial.print("\t");
-	Serial.print("Axl:");
-	Serial.print(g_max_diff_axl, 2);
-	Serial.println("");
-	g_max_diff_axl = 0.0;
-	// 近接センサ
-	Serial.print(F("Proximity:"));
-	Serial.print(g_ps_val);
-	Serial.print(F("\t"));
-	Serial.print(F("Light:"));
-	Serial.print(g_als_val);
-	Serial.println();
-	
-	
-
 	int dist = _us_get_distance();
 
 	// Stop in case of obstacle
