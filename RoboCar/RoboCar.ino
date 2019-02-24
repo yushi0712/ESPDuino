@@ -4,6 +4,8 @@
 #include "BluetoothSerial.h"
 #include "esp_system.h"
 #include "dev_MPU6050.h"
+#include "freertos/task.h"
+
 
 // Motor
 #define	IO_PIN_MOTOR_1			(14)
@@ -219,6 +221,39 @@ void _stop()
 	Serial.println("Stop!");
 }
 
+float pre_abs_axl = 0;
+float	g_temperature = 0.0;
+float 	g_diff_axl = 0.0;
+void _Task_proc(void* param)
+{
+	int error;
+	float	acc_x, acc_y, acc_z;
+	float	gyro_x, gyro_y, gyro_z;
+
+	for(;;) {
+		// 加速度、角速度、温度を取得
+		error = MPU6050_get_all(&acc_x, &acc_y, &acc_z, &gyro_x, &gyro_y, &gyro_z, &g_temperature);
+
+		float abs_axl = (acc_x*acc_x + acc_y*acc_y + acc_z*acc_z);
+		float diff_axl = abs_axl - pre_abs_axl;
+		if(diff_axl < 0) {
+			diff_axl = -diff_axl;
+		}
+		pre_abs_axl = abs_axl;
+		g_diff_axl = diff_axl;
+
+		if(diff_axl < 0.2) {
+			digitalWrite(IO_PIN_LED,LOW);
+		}
+		else {
+			digitalWrite(IO_PIN_LED,HIGH);
+		}
+
+		vTaskDelay(50);
+	}
+
+}
+
 void setup()
 {
 	byte rc;
@@ -275,44 +310,20 @@ void setup()
 	// 加速度センサ初期化
 	MPU6050_init(&Wire);
 
+	// コア0で関数task0をstackサイズ4096,優先順位1で起動
+	xTaskCreatePinnedToCore(_Task_proc, "Task_proc", 4096, NULL, 1, NULL, 0);
+
 	Serial.println("Completed setup program successfully.");
 }
 
-float pre_abs_axl = 0;
 void loop()
 {
-	int error;
-	float	acc_x, acc_y, acc_z;
-	float	gyro_x, gyro_y, gyro_z;
-	float	temperature;
-
-	// 加速度、角速度、温度を取得
-	error = MPU6050_get_all(&acc_x, &acc_y, &acc_z, &gyro_x, &gyro_y, &gyro_z, &temperature);
-
-	Serial.print(error, DEC);
+	Serial.print("Temp:");
+	Serial.print(g_temperature, 1);
 	Serial.print("\t");
-
-	Serial.print(temperature, 1);
-	Serial.print("\t");
-
-	float abs_axl = (acc_x*acc_x + acc_y*acc_y + acc_z*acc_z);
-	float diff_axl = abs_axl - pre_abs_axl;
-	if(diff_axl < 0) {
-		diff_axl = -diff_axl;
-	}
-	pre_abs_axl = abs_axl;
-	Serial.print(diff_axl, 2);
-	Serial.print("\t");
+	Serial.print("Axl:");
+	Serial.print(g_diff_axl, 2);
 	Serial.println("");
-
-	if(diff_axl < 0.2) {
-		digitalWrite(IO_PIN_LED,LOW);
-	}
-	else {
-		digitalWrite(IO_PIN_LED,HIGH);
-	}
-
-	delay(50);
 
 	byte rc;
 	unsigned short ps_val;
