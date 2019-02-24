@@ -16,6 +16,7 @@
 #define	IO_PIN_MOTOR_ENB		(27)
 // LED
 #define	IO_PIN_LED				(18)
+#define	IO_PIN_LED2				(2)
 // US Sendor
 #define	IO_PIN_US_ECHO			(36)
 #define	IO_PIN_US_TRIG			( 5)
@@ -282,6 +283,13 @@ void _Task_sensor(void* param)
 		}
 		pre_abs_axl = abs_axl;
 
+		// 照度・近接センサの値を取得
+		unsigned short ps_val;
+		float als_val;
+		rc = rpr0521rs.get_psalsval(&ps_val, &als_val);
+		if(rc == 0) {
+		}
+
 		if(diff_axl < 0.5) {
 			digitalWrite(IO_PIN_LED,LOW);
 		}
@@ -289,11 +297,11 @@ void _Task_sensor(void* param)
 			digitalWrite(IO_PIN_LED,HIGH);
 		}
 
-		// 照度・近接センサの値を取得
-		unsigned short ps_val;
-		float als_val;
-		rc = rpr0521rs.get_psalsval(&ps_val, &als_val);
-		if(rc == 0) {
+		if(als_val > 10.0) {
+			digitalWrite(IO_PIN_LED2,LOW);
+		}
+		else {
+			digitalWrite(IO_PIN_LED2,HIGH);
 		}
 
 		// ▼▼▼ [排他制御区間]開始 ▼▼▼
@@ -331,7 +339,6 @@ void _Task_disp(void* param)
 		xSemaphoreGive(g_xMutex);
 		// ▲▲▲ [排他制御区間]開始 ▲▲▲
 
-		/*
 		// 加速度センサ
 		Serial.print("Temp:");
 		Serial.print(temperature, 1);
@@ -348,7 +355,6 @@ void _Task_disp(void* param)
 		Serial.println();
 
 		Serial.println();
-		*/
 	}
 	
 }
@@ -371,6 +377,7 @@ void setup()
 	pinMode(IO_PIN_US_ECHO, INPUT);    
 	pinMode(IO_PIN_US_TRIG, OUTPUT);  
 	pinMode(IO_PIN_LED, OUTPUT);
+	pinMode(IO_PIN_LED2, OUTPUT);
 	pinMode(IO_PIN_MOTOR_1,OUTPUT);
 	pinMode(IO_PIN_MOTOR_2,OUTPUT);
 	pinMode(IO_PIN_MOTOR_3,OUTPUT);
