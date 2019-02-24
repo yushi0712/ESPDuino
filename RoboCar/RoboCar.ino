@@ -81,6 +81,9 @@ int	g_ctrl_mode = CTRLMODE_MANUAL_DRIVE;
 float servo_coeff_a;
 float servo_coeff_b;
 
+SemaphoreHandle_t g_xMutex = NULL;
+
+
 
 void _servo_angle(int angle)
 {
@@ -223,14 +226,18 @@ void _stop()
 
 float pre_abs_axl = 0;
 float	g_temperature = 0.0;
-float 	g_diff_axl = 0.0;
-void _Task_proc(void* param)
+float	g_max_diff_axl = 0.0;
+void _Task_axl(void* param)
 {
 	int error;
 	float	acc_x, acc_y, acc_z;
 	float	gyro_x, gyro_y, gyro_z;
+	BaseType_t xStatus;
 
+	xSemaphoreGive(g_xMutex);
 	for(;;) {
+		vTaskDelay(50);
+
 		// 加速度、角速度、温度を取得
 		error = MPU6050_get_all(&acc_x, &acc_y, &acc_z, &gyro_x, &gyro_y, &gyro_z, &g_temperature);
 
@@ -240,7 +247,6 @@ void _Task_proc(void* param)
 			diff_axl = -diff_axl;
 		}
 		pre_abs_axl = abs_axl;
-		g_diff_axl = diff_axl;
 
 		if(diff_axl < 0.2) {
 			digitalWrite(IO_PIN_LED,LOW);
@@ -249,7 +255,13 @@ void _Task_proc(void* param)
 			digitalWrite(IO_PIN_LED,HIGH);
 		}
 
-		vTaskDelay(50);
+		// ▼▼▼ [排他制御区間]開始 ▼▼▼
+		xStatus = xSemaphoreTake(g_xMutex, 0);
+		if(diff_axl > g_max_diff_axl) {
+			g_max_diff_axl = diff_axl;
+		}
+		xSemaphoreGive(g_xMutex);
+		// ▲▲▲ [排他制御区間]開始 ▲▲▲
 	}
 
 }
@@ -311,7 +323,8 @@ void setup()
 	MPU6050_init(&Wire);
 
 	// コア0で関数task0をstackサイズ4096,優先順位1で起動
-	xTaskCreatePinnedToCore(_Task_proc, "Task_proc", 4096, NULL, 1, NULL, 0);
+	g_xMutex = xSemaphoreCreateMutex();
+	xTaskCreatePinnedToCore(_Task_axl, "Task_axl", 4096, NULL, 1, NULL, 0);
 
 	Serial.println("Completed setup program successfully.");
 }
@@ -322,8 +335,9 @@ void loop()
 	Serial.print(g_temperature, 1);
 	Serial.print("\t");
 	Serial.print("Axl:");
-	Serial.print(g_diff_axl, 2);
+	Serial.print(g_max_diff_axl, 2);
 	Serial.println("");
+	g_max_diff_axl = 0.0;
 
 	byte rc;
 	unsigned short ps_val;
