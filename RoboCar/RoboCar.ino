@@ -227,12 +227,15 @@ void _stop()
 float pre_abs_axl = 0;
 float	g_temperature = 0.0;
 float	g_max_diff_axl = 0.0;
+unsigned short g_ps_val;
+float g_als_val;
 void _Task_axl(void* param)
 {
 	int error;
 	float	acc_x, acc_y, acc_z;
 	float	gyro_x, gyro_y, gyro_z;
 	BaseType_t xStatus;
+	byte rc;
 
 	xSemaphoreGive(g_xMutex);
 	for(;;) {
@@ -255,11 +258,21 @@ void _Task_axl(void* param)
 			digitalWrite(IO_PIN_LED,HIGH);
 		}
 
+
+		// 照度・近接センサの値を取得
+		unsigned short ps_val;
+		float als_val;
+		rc = rpr0521rs.get_psalsval(&ps_val, &als_val);
+		if(rc == 0) {
+		}
+
 		// ▼▼▼ [排他制御区間]開始 ▼▼▼
 		xStatus = xSemaphoreTake(g_xMutex, 0);
 		if(diff_axl > g_max_diff_axl) {
 			g_max_diff_axl = diff_axl;
 		}
+		g_ps_val = ps_val;
+		g_als_val = als_val;
 		xSemaphoreGive(g_xMutex);
 		// ▲▲▲ [排他制御区間]開始 ▲▲▲
 	}
@@ -331,6 +344,7 @@ void setup()
 
 void loop()
 {
+	// 加速度センサ
 	Serial.print("Temp:");
 	Serial.print(g_temperature, 1);
 	Serial.print("\t");
@@ -338,27 +352,15 @@ void loop()
 	Serial.print(g_max_diff_axl, 2);
 	Serial.println("");
 	g_max_diff_axl = 0.0;
-
-	byte rc;
-	unsigned short ps_val;
-	float als_val;
-	byte near_far;
-
-	// 照度・近接センサの値を取得
-	rc = rpr0521rs.get_psalsval(&ps_val, &als_val);
-	if(rc == 0) {
-		// 近接センサ
-		Serial.print(F("Proximity = "));
-		Serial.print(ps_val);
-		Serial.println(F(" [count]"));
-		// 照度センサ
-		if (als_val != RPR0521RS_ERROR) {
-			Serial.print(F("Ambient Light = "));
-			Serial.print(als_val);
-			Serial.println(F(" [lx]"));
-			Serial.println();
-		}
-	}
+	// 近接センサ
+	Serial.print(F("Proximity:"));
+	Serial.print(g_ps_val);
+	Serial.print(F("\t"));
+	Serial.print(F("Light:"));
+	Serial.print(g_als_val);
+	Serial.println();
+	
+	
 
 	int dist = _us_get_distance();
 
